@@ -7,23 +7,23 @@ use anyhow::Result;use clap::Parser;use log::{error, info};use std::process;use 
         Fast Passive Subdomain Enumeration
               Made with ❤️  and 🦀
          Authors: Daniel Alisom
-"#;#[tokio::main]async fn main() -> Result<()> {    // Initialize logging
+"#;#[tokio::main]async fn main() -> Result<()> {
     env_logger::Builder::from_default_env()
         .filter_level(log::LevelFilter::Info)
-        .init();    let args = Args::parse();    // Show banner unless in silent mode
+        .init();    let args = Args::parse();
     if !args.silent {
         println!("{}", BANNER);
-    }    // Handle special commands
+    }
     if args.list_sources {
         list_sources();
         return Ok(());
     }    if args.update {
         return Ok(updater::check_and_update().await.map_err(|e| anyhow::anyhow!(e))?);
-    }    let domains = get_domains_from_args(&args);    // Validate input arguments
+    }    let domains = get_domains_from_args(&args); 
     if domains.is_empty() && !args.use_stdin() {
         error!("No input provided. Use -d <domain>, -l <file>, or pipe domains to stdin");
         process::exit(1);
-    }    // Create and run the engine
+    }
     let mut engine = RustFinderEngine::new(args.clone()).await?;
 
     let stats = engine.run(domains).await.map_err(|e| anyhow::anyhow!("Enumeration failed: {}", e))?;
