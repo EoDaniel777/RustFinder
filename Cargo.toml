@@ -1,0 +1,71 @@
+[package]
+name = "rustfinder"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.40", features = ["full"] }
+async-trait = "0.1"
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json", "gzip", "deflate", "socks"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Logging
+log = "0.4"
+env_logger = "0.11"
+
+# Rate limiting - Versão corrigida
+governor = "0.6"
+
+# DNS resolution
+trust-dns-resolver = "0.23"
+
+# CLI
+clap = { version = "4.5", features = ["derive"] }
+atty = "0.2"
+
+# Configuration
+toml = "0.8"
+dotenv = "0.15"
+
+# Utilities
+futures = "0.3"
+rand = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1.10"
+url = "2.5"
+urlencoding = "2.1"
+
+# Progress bars
+indicatif = "0.17"
+
+# Concurrent data structures
+dashmap = "5.5"
+
+# Terminal utilities
+term_size = "0.3"
+
+[features]
+self-update = []
+
+[dev-dependencies]
+mockito = "1.4"
+tempfile = "3.10"
+
+[build-dependencies]
+chrono = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

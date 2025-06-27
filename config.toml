@@ -1,0 +1,59 @@
+# RustFinder Configuration File Example
+# Copy this file to config.toml and customize as needed
+
+# HTTP timeout in seconds
+timeout = 30
+
+# User agent string
+user_agent = "RustFinder/1.0"
+
+# Proxy URL (optional)
+# proxy = "http://proxy.example.com:8080"
+
+# Sources to use (leave empty for all)
+sources = [
+    "virustotal",
+    "securitytrails",
+    "shodan",
+    "chaos",
+    "github",
+    "netlas"
+]
+
+# API Keys for each source
+[api_keys]
+virustotal = ["your_virustotal_api_key_1", "your_virustotal_api_key_2"]
+securitytrails = ["your_securitytrails_api_key"]
+shodan = ["your_shodan_api_key"]
+chaos = ["your_chaos_api_key"]
+github = ["ghp_your_github_token"]
+netlas = ["your_netlas_api_key"]
+
+# Rate limits (requests per second)
+[rate_limits]
+virustotal = 4
+securitytrails = 1
+shodan = 1
+chaos = 10
+github = 1
+netlas = 1
+
+# Output configuration
+[output]
+format = "text" # Options: text, json, csv
+file = "results/subdomains.txt"
+verbose = false
+include_ips = true
+
+# DNS resolver configuration
+[resolver]
+enabled = true
+threads = 50
+timeout = 5
+use_system_resolver = false
+nameservers = [
+    "8.8.8.8:53",
+    "8.8.4.4:53",
+    "1.1.1.1:53",
+    "1.0.0.1:53"
+]
