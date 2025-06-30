@@ -7,7 +7,7 @@
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/rustfinder/rustfinder)
 
 <!-- Espaço reservado para a captura de tela -->
-![RustFinder Screenshot](https://via.placeholder.com/800x400.png?text=RustFinder+em+Ação)
+![RustFinder Screenshot](assets/logo.png)
 <!-- Fim do espaço reservado para a captura de tela -->
 
 RustFinder é uma ferramenta de enumeração de subdomínios passiva de alto desempenho projetada para descobrir subdomínios usando várias fontes online sem interagir diretamente com a infraestrutura do alvo. Construído com Rust para máximo desempenho, segurança e concorrência.
@@ -226,50 +226,19 @@ rustfinder -d example.com --resolvers 8.8.8.8,1.1.1.1
 
 ## Fontes
 
-O RustFinder suporta mais de 40 fontes para enumeração de subdomínios:
+O RustFinder atualmente suporta 8 fontes para enumeração de subdomínios:
 
 ### Fontes Gratuitas (Não é necessária chave de API)
-- **alienvault** - AlienVault OTX
-- **anubis** - Anubis-DB
-- **commoncrawl** - Common Crawl
 - **crtsh** - Certificate Transparency
-- **digitorus** - CertificateDetails
 - **hackertarget** - HackerTarget
-- **rapiddns** - RapidDNS
-- **robtex** - Robtex
-- **sitedossier** - SiteDossier
-- **threatcrowd** - ThreatCrowd
-- **waybackarchive** - Wayback Machine
 
 ### Fontes de API (Requerem Chaves de API)
-- **bevigil** - BeVigil OSINT API
-- **bufferover** - BufferOver
-- **builtwith** - BuiltWith
-- **c99** - C99.nl
-- **censys** - Censys Search
-- **certspotter** - CertSpotter
 - **chaos** - Chaos Dataset
-- **chinaz** - Chinaz
-- **dnsdb** - Farsight DNSDB
-- **dnsdumpster** - DNSdumpster
-- **facebook** - Facebook Certificate Transparency
-- **fofa** - FOFA Search Engine
-- **fullhunt** - FullHunt
 - **github** - GitHub Code Search
-- **hunter** - Hunter.how
-- **intelx** - Intelligence X
-- **leakix** - LeakIX
 - **netlas** - Netlas.io
-- **pugrecon** - PugRecon
-- **quake** - Quake Search
-- **redhuntlabs** - RedHunt Labs
-- **rsecloud** - RSE Cloud
 - **securitytrails** - SecurityTrails
 - **shodan** - Shodan
-- **threatbook** - ThreatBook
 - **virustotal** - VirusTotal
-- **whoisxmlapi** - WhoisXML API
-- **zoomeyeapi** - ZoomEye
 
 ## Contribuição
 
