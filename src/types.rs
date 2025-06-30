@@ -149,6 +149,9 @@ pub enum RustFinderError {
     #[error("Parse error: {0}")]
     ParseError(String),
 
+    #[error("JSON parse error: {0}\nBody: {1}")]
+    JsonParseError(String, String),
+
     #[error("Resolution error: {0}")]
     ResolutionError(String),
 

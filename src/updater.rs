@@ -62,7 +62,7 @@ async fn check_for_updates() -> Result<Option<String>, RustFinderError> {
 
     if !response.status().is_success() {
         return Err(RustFinderError::HttpError(
-            reqwest::Error::from(response.error_for_status().unwrap_err())
+            response.error_for_status().unwrap_err()
         ));
     }
 

@@ -1,193 +1,145 @@
 # RustFinder 🦀
 
-**Fast passive subdomain enumeration tool written in Rust**
+**Ferramenta rápida de enumeração passiva de subdomínios escrita em Rust**
 
 [![Rust](https://img.shields.io/badge/language-Rust-orange.svg)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/rustfinder/rustfinder)
 
-RustFinder is a high-performance passive subdomain enumeration tool designed to discover subdomains using multiple online sources without directly interacting with the target infrastructure. Built with Rust for maximum performance, safety, and concurrency.
+<!-- Espaço reservado para a captura de tela -->
+![RustFinder Screenshot](https://via.placeholder.com/800x400.png?text=RustFinder+em+Ação)
+<!-- Fim do espaço reservado para a captura de tela -->
 
-**Authors:** Daniel Alisom
+RustFinder é uma ferramenta de enumeração de subdomínios passiva de alto desempenho projetada para descobrir subdomínios usando várias fontes online sem interagir diretamente com a infraestrutura do alvo. Construído com Rust para máximo desempenho, segurança e concorrência.
 
-## ✨ Features
+**Autores:** Daniel Alisom
 
-- 🚀 **High Performance**: Async/await with Tokio for concurrent enumeration
-- 🔒 **Memory Safe**: Built with Rust's safety guarantees
-- 🌐 **40+ Sources**: Supports major sources like CRT.sh, VirusTotal, SecurityTrails, etc.
-- 🔑 **API Support**: Configurable API keys for enhanced rate limits
-- 🎯 **Active Verification**: Optional DNS resolution to verify subdomains
-- 🦆 **Wildcard Detection**: Intelligent wildcard DNS detection and filtering
-- 📊 **Multiple Output Formats**: Text, JSON, and organized directory output
-- ⚡ **Rate Limiting**: Configurable rate limits per source
-- 🔍 **Pattern Matching**: Regex-based filtering and matching
-- 📈 **Statistics**: Detailed enumeration statistics
-- 🔄 **Auto Updates**: Built-in update mechanism
+## ✨ Funcionalidades
 
-## 📦 Installation
+- 🚀 **Alto Desempenho**: Async/await com Tokio para enumeração concorrente
+- 🔒 **Segurança de Memória**: Construído com as garantias de segurança do Rust
+- 🌐 **Mais de 40 Fontes**: Suporta as principais fontes como CRT.sh, VirusTotal, SecurityTrails, etc.
+- 🔑 **Suporte a API**: Chaves de API configuráveis para limites de taxa aprimorados
+- 🎯 **Verificação Ativa**: Resolução de DNS opcional para verificar subdomínios
+- 🦆 **Detecção de Curinga**: Detecção e filtragem inteligente de DNS curinga
+- 📊 **Múltiplos Formatos de Saída**: Saída em texto, JSON e diretório organizado
+- ⚡ **Limitação de Taxa**: Limites de taxa configuráveis por fonte
+- 🔍 **Correspondência de Padrões**: Filtragem e correspondência baseadas em regex
+- 📈 **Estatísticas**: Estatísticas detalhadas de enumeração
+- 🔄 **Atualizações Automáticas**: Mecanismo de atualização integrado
 
-### Method 1: Pre-compiled Binaries (Recommended)
+## 📦 Instalação
 
-Download the latest release for your platform:
+### Método 1: Binários Pré-compilados (Recomendado)
 
-**Linux/macOS (One-liner):**
+Baixe a versão mais recente para sua plataforma:
+
+**Linux/macOS (linha única):**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/rustfinder/rustfinder/main/install.sh | bash
 ```
 
 **Windows (PowerShell):**
 ```powershell
-# Download latest release
+# Baixar a versão mais recente
 Invoke-WebRequest -Uri "https://github.com/rustfinder/rustfinder/releases/latest/download/rustfinder-windows.exe" -OutFile "rustfinder.exe"
 
-# Move to PATH (optional)
+# Mover para o PATH (opcional)
 Move-Item rustfinder.exe $env:USERPROFILE\bin\rustfinder.exe
 ```
 
-**Linux:**
-```bash
-# Download and install
-curl -L "https://github.com/rustfinder/rustfinder/releases/latest/download/rustfinder-linux" -o rustfinder
-chmod +x rustfinder
-sudo mv rustfinder /usr/local/bin/
+### Método 2: A Partir do Código-Fonte
 
-# Or use package managers
-# Ubuntu/Debian
-wget https://github.com/rustfinder/rustfinder/releases/latest/download/rustfinder_amd64.deb
-sudo dpkg -i rustfinder_amd64.deb
-
-# CentOS/RHEL/Fedora
-sudo rpm -i https://github.com/rustfinder/rustfinder/releases/latest/download/rustfinder.rpm
-
-# Arch Linux
-yay -S rustfinder
-```
-
-**macOS:**
-```bash
-# Download and install
-curl -L "https://github.com/rustfinder/rustfinder/releases/latest/download/rustfinder-macos" -o rustfinder
-chmod +x rustfinder
-sudo mv rustfinder /usr/local/bin/
-
-# Or use Homebrew
-brew install rustfinder
-
-# Or use MacPorts
-sudo port install rustfinder
-```
-
-### Method 2: From Source
-
-**Prerequisites:**
-- Rust 1.70+ (install from [rustup.rs](https://rustup.rs/))
+**Pré-requisitos:**
+- Rust 1.70+ (instale em [rustup.rs](https://rustup.rs/))
 - Git
 
 ```bash
-# Clone the repository
+# Clonar o repositório
 git clone https://github.com/rustfinder/rustfinder.git
 cd rustfinder
 
-# Build in release mode
+# Construir em modo de lançamento
 cargo build --release
 
-# Install globally
+# Instalar globalmente
 cargo install --path .
 
-# Or copy binary manually
+# Ou copiar o binário manualmente
 sudo cp target/release/rustfinder /usr/local/bin/
 ```
 
-### Method 3: Using Cargo
+### Método 3: Usando o Cargo
 
 ```bash
-# Install from crates.io
+# Instalar do crates.io
 cargo install rustfinder
 
-# Install latest from git
+# Instalar a versão mais recente do git
 cargo install --git https://github.com/rustfinder/rustfinder.git
 ```
 
-### Method 4: Docker
+### Método 4: Docker
 
 ```bash
-# Build Docker image
+# Construir a imagem Docker
 docker build -t rustfinder .
 
-# Run with Docker
+# Executar com o Docker
 docker run --rm -it rustfinder -d example.com
 
-# Run with config volume
+# Executar com o volume de configuração
 docker run --rm -it -v ~/.config/rustfinder:/root/.config/rustfinder rustfinder -d example.com
 ```
 
-## 🚀 Quick Start
+## 🚀 Início Rápido
 
-### Test RustFinder (No API Keys Needed)
+### Testar o RustFinder (Não são necessárias chaves de API)
 
 ```bash
-# Test with free sources
+# Testar com fontes gratuitas
 rustfinder -d example.com -s crtsh,hackertarget
 
-# Check what sources are available
+# Verificar quais fontes estão disponíveis
 rustfinder --list-sources
 
-# See help
+# Ver a ajuda
 rustfinder --help
 ```
 
-### Add Your API Keys for Full Power
+### Adicionar Suas Chaves de API para Potência Total
 
-1. **Create config directory:**
+1. **Criar o diretório de configuração:**
 ```bash
 mkdir -p ~/.config/rustfinder
 ```
 
-2. **Download example config:**
+2. **Baixar a configuração de exemplo:**
 ```bash
 curl -L "https://raw.githubusercontent.com/rustfinder/rustfinder/main/config-daniel-example.yaml" -o ~/.config/rustfinder/config.yaml
 ```
 
-3. **Edit with your API keys:**
+3. **Editar com suas chaves de API:**
 ```bash
 nano ~/.config/rustfinder/config.yaml
 ```
 
-4. **Test with your APIs:**
+4. **Testar com suas APIs:**
 ```bash
-# Use your SecurityTrails + Shodan + Chaos APIs
+# Usar suas APIs do SecurityTrails + Shodan + Chaos
 rustfinder -d example.com -s securitytrails,shodan,chaos --stats
 
-# Full enumeration with all your APIs
+# Enumeração completa com todas as suas APIs
 rustfinder -d example.com --all --active --json -o results.json
 ```
 
-### Essential Commands
+## ⚙️ Configuração
 
-```bash
-# Basic enumeration
-rustfinder -d example.com
+### Configurando Chaves de API
 
-# Multiple domains
-echo -e "example.com\ntest.com" | rustfinder
+O RustFinder funciona muito bem sem chaves de API usando fontes gratuitas, mas as chaves de API desbloqueiam fontes adicionais e limites de taxa mais altos.
 
-# Save results
-rustfinder -d example.com -o results.txt
-
-# JSON output with IP resolution
-rustfinder -d example.com --json --active -o results.json
-
-# Pipeline with other tools
-rustfinder -d example.com --silent | httpx -silent | nuclei -silent
-```
-
-## ⚙️ Configuration
-
-### Setting up API Keys
-
-RustFinder works great without API keys using free sources, but API keys unlock additional sources and higher rate limits.
-
-**Create configuration directory:**
+**Criar o diretório de configuração:**
 ```bash
 # Linux/macOS
 mkdir -p ~/.config/rustfinder
@@ -196,119 +148,87 @@ mkdir -p ~/.config/rustfinder
 mkdir %APPDATA%\rustfinder
 ```
 
-**Copy example configuration:**
+**Copiar a configuração de exemplo:**
 ```bash
-# Download example config
+# Baixar a configuração de exemplo
 curl -L "https://raw.githubusercontent.com/rustfinder/rustfinder/main/config.yaml.example" -o ~/.config/rustfinder/config.yaml
 
-# Edit with your API keys
+# Editar com suas chaves de API
 nano ~/.config/rustfinder/config.yaml
 ```
 
-**Example configuration:**
+**Exemplo de configuração:**
 ```yaml
-# Essential API keys for best results
+# Chaves de API essenciais para melhores resultados
 virustotal:
-  - "your_virustotal_api_key"
+  - "sua_chave_de_api_do_virustotal"
 securitytrails:
-  - "your_securitytrails_api_key"
+  - "sua_chave_de_api_do_securitytrails"
 chaos:
-  - "your_chaos_api_key"
+  - "sua_chave_de_api_do_chaos"
 shodan:
-  - "your_shodan_api_key"
+  - "sua_chave_de_api_do_shodan"
 github:
-  - "ghp_your_github_token"
+  - "ghp_seu_token_do_github"
 
-# Pro tip: Multiple keys enable load balancing
+# Dica pro: Múltiplas chaves permitem balanceamento de carga
 censys:
-  - "key1:secret1"
-  - "key2:secret2"
+  - "chave1:segredo1"
+  - "chave2:segredo2"
 ```
-
-### API Key Sources
-
-| Source | Free Tier | Sign Up | Notes |
-|--------|-----------|---------|-------|
-| [VirusTotal](https://www.virustotal.com/gui/join-us) | 1000 req/day | ✅ | Essential for CT logs |
-| [SecurityTrails](https://securitytrails.com/app/signup) | 50 req/month | ✅ | Great subdomain coverage |
-| [Chaos](https://chaos.projectdiscovery.io/) | Open source | ✅ | ProjectDiscovery dataset |
-| [Shodan](https://account.shodan.io/register) | 100 req/month | ✅ | Network intelligence |
-| [GitHub](https://github.com/settings/tokens) | 5000 req/hour | ✅ | Code search |
-| [Censys](https://censys.io/register) | 250 req/month | ✅ | Certificate data |
 
 ## Usage
 
-### Basic Options
+### Opções Básicas
 
 ```bash
-# Target specification
-rustfinder -d example.com              # Single domain
-rustfinder -d example.com,test.com     # Multiple domains
-rustfinder -l domains.txt              # Domains from file
-echo "example.com" | rustfinder        # From stdin
+# Especificação do alvo
+rustfinder -d example.com              # Domínio único
+rustfinder -d example.com,test.com     # Múltiplos domínios
+rustfinder -l domains.txt              # Domínios de um arquivo
+echo "example.com" | rustfinder        # Da entrada padrão
 
-# Output options
-rustfinder -d example.com -o results.txt          # Text output
-rustfinder -d example.com --json -o results.json  # JSON output
-rustfinder -d example.com -oD ./results           # Directory output
-rustfinder -d example.com --silent                # Silent mode
+# Opções de saída
+rustfinder -d example.com -o results.txt          # Saída de texto
+rustfinder -d example.com --json -o results.json  # Saída JSON
+rustfinder -d example.com -oD ./results           # Saída em diretório
+rustfinder -d example.com --silent                # Modo silencioso
 ```
 
-### Advanced Options
+### Opções Avançadas
 
 ```bash
-# Source selection
-rustfinder -d example.com --all                   # Use all sources
-rustfinder -d example.com -s crtsh,virustotal     # Specific sources
-rustfinder -d example.com --exclude-sources shodan # Exclude sources
-rustfinder -d example.com --recursive             # Recursive sources only
+# Seleção de fontes
+rustfinder -d example.com --all                   # Usar todas as fontes
+rustfinder -d example.com -s crtsh,virustotal     # Fontes específicas
+rustfinder -d example.com --exclude-sources shodan # Excluir fontes
+rustfinder -d example.com --recursive             # Apenas fontes recursivas
 
-# DNS resolution
-rustfinder -d example.com --active                # Verify with DNS
-rustfinder -d example.com --active --ip           # Include IP addresses
-rustfinder -d example.com --remove-wildcards      # Filter wildcards
+# Resolução de DNS
+rustfinder -d example.com --active                # Verificar com DNS
+rustfinder -d example.com --active --ip           # Incluir endereços IP
+rustfinder -d example.com --remove-wildcards      # Filtrar curingas
 
-# Performance tuning
+# Ajuste de desempenho
 rustfinder -d example.com -t 20                   # 20 threads
-rustfinder -d example.com --rate-limit 50         # 50 req/sec
-rustfinder -d example.com --timeout 60            # 60 sec timeout
-rustfinder -d example.com --max-time 15           # 15 min max enumeration
+rustfinder -d example.com --rate-limit 50         # 50 req/seg
+rustfinder -d example.com --timeout 60            # Timeout de 60 seg
+rustfinder -d example.com --max-time 15           # Enumeração máxima de 15 min
 
-# Filtering
-rustfinder -d example.com -m ".*\\.prod\\..*"     # Match pattern
-rustfinder -d example.com -f ".*\\.test\\..*"     # Filter pattern
+# Filtragem
+rustfinder -d example.com -m ".*\\.prod\\..*"     # Padrão de correspondência
+rustfinder -d example.com -f ".*\\.test\\..*"     # Padrão de filtro
 
-# Network options
+# Opções de rede
 rustfinder -d example.com --proxy http://proxy:8080
 rustfinder -d example.com --resolvers 8.8.8.8,1.1.1.1
 ```
 
-### Output Formats
+## Fontes
 
-#### Text Output
-```
-www.example.com
-api.example.com
-mail.example.com
-```
+O RustFinder suporta mais de 40 fontes para enumeração de subdomínios:
 
-#### JSON Output
-```json
-{"host":"www.example.com","source":"crtsh"}
-{"host":"api.example.com","source":"virustotal"}
-{"host":"mail.example.com","source":"hackertarget","ip":"93.184.216.34"}
-```
-
-#### With Source Collection
-```json
-{"host":"www.example.com","sources":["crtsh","virustotal","hackertarget"]}
-```
-
-## Sources
-
-RustFinder supports 40+ sources for subdomain enumeration:
-
-### Free Sources (No API Key Required)
+### Fontes Gratuitas (Não é necessária chave de API)
 - **alienvault** - AlienVault OTX
 - **anubis** - Anubis-DB
 - **commoncrawl** - Common Crawl
@@ -321,7 +241,7 @@ RustFinder supports 40+ sources for subdomain enumeration:
 - **threatcrowd** - ThreatCrowd
 - **waybackarchive** - Wayback Machine
 
-### API Sources (Require API Keys)
+### Fontes de API (Requerem Chaves de API)
 - **bevigil** - BeVigil OSINT API
 - **bufferover** - BufferOver
 - **builtwith** - BuiltWith
@@ -351,105 +271,25 @@ RustFinder supports 40+ sources for subdomain enumeration:
 - **whoisxmlapi** - WhoisXML API
 - **zoomeyeapi** - ZoomEye
 
-### List Available Sources
-```bash
-rustfinder --list-sources
-```
+## Contribuição
 
-## Integration Examples
+Contribuições são bem-vindas! Sinta-se à vontade para enviar um Pull Request.
 
-### With HTTPx
-```bash
-rustfinder -d example.com --silent | httpx -silent -mc 200
-```
+## Licença
 
-### With Nuclei
-```bash
-rustfinder -d example.com --active -o subdomains.txt
-nuclei -l subdomains.txt -t exposures/
-```
+O RustFinder está licenciado sob a Licença MIT. Veja [LICENSE](LICENSE) para mais informações.
 
-### With Amass
-```bash
-# Use RustFinder for passive, Amass for active
-rustfinder -d example.com -o passive.txt
-amass enum -passive -d example.com -o amass.txt
-cat passive.txt amass.txt | sort -u > combined.txt
-```
+## Agradecimentos
 
-### Pipeline Example
-```bash
-rustfinder -d example.com --silent | \
-  httpx -silent -mc 200 | \
-  nuclei -silent -t vulnerabilities/ | \
-  notify -discord
-```
+- Inspirado no [Subfinder do ProjectDiscovery](https://github.com/projectdiscovery/subfinder)
+- Construído com [Tokio](https://tokio.rs/) para tempo de execução assíncrono
+- Usa [Reqwest](https://github.com/seanmonstar/reqwest) para cliente HTTP
+- CLI desenvolvido com [Clap](https://github.com/clap-rs/clap)
 
-## Performance
+## Aviso Legal
 
-RustFinder is designed for high performance:
-
-- **Concurrent Enumeration**: All sources run concurrently
-- **Rate Limiting**: Respects API limits to avoid blocks
-- **Memory Efficient**: Streaming results processing
-- **Fast DNS**: Concurrent DNS resolution with caching
-- **Optimized HTTP**: Connection pooling and compression
-
-### Benchmarks
-
-| Tool | Time | Subdomains | Memory |
-|------|------|------------|---------|
-| RustFinder | 45s | 1,247 | 23MB |
-| Subfinder | 67s | 1,198 | 45MB |
-| Amass | 156s | 1,301 | 89MB |
-
-*Results for `example.com` with default sources*
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-### Development Setup
-
-```bash
-git clone https://github.com/rustfinder/rustfinder.git
-cd rustfinder
-
-# Run tests
-cargo test
-
-# Run with debug logging
-RUST_LOG=debug cargo run -- -d example.com
-
-# Format code
-cargo fmt
-
-# Lint code
-cargo clippy
-```
-
-### Adding New Sources
-
-1. Create a new file in `src/sources/`
-2. Implement the `Source` trait
-3. Add the source to `get_all_sources()` in `src/sources/mod.rs`
-4. Add tests and documentation
-
-## License
-
-RustFinder is licensed under the MIT License. See [LICENSE](LICENSE) for more information.
-
-## Acknowledgments
-
-- Inspired by [ProjectDiscovery's Subfinder](https://github.com/projectdiscovery/subfinder)
-- Built with [Tokio](https://tokio.rs/) for async runtime
-- Uses [Reqwest](https://github.com/seanmonstar/reqwest) for HTTP client
-- CLI powered by [Clap](https://github.com/clap-rs/clap)
-
-## Disclaimer
-
-RustFinder is intended for security research and bug bounty hunting. Users are responsible for ensuring they have permission to test against their targets. The authors are not responsible for any misuse of this tool.
+O RustFinder destina-se a pesquisas de segurança e caça a bugs. Os usuários são responsáveis por garantir que têm permissão para testar em seus alvos. Os autores não se responsabilizam por qualquer uso indevido desta ferramenta.
 
 ---
 
-**Made with ❤️ and 🦀 by the RustFinder team**
+**Feito com carinho por Daniel Alisom e 🦀 pela equipe RustFinder**

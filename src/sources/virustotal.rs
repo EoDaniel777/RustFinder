@@ -1,8 +1,9 @@
 // src/sources/virustotal.rs
+use crate::session::Session;
 use crate::sources::Source;
 use crate::types::{RustFinderError, SourceInfo, SubdomainResult};
-use crate::session::Session;
 use async_trait::async_trait;
+use log::warn;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -34,6 +35,12 @@ struct DnsRecord {
 pub struct VirusTotalSource {
     name: String,
     api_keys: Vec<String>,
+}
+
+impl Default for VirusTotalSource {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl VirusTotalSource {
@@ -78,12 +85,13 @@ impl Source for VirusTotalSource {
     }
 
     async fn enumerate(&self, domain: &str, session: &Session) -> Result<Vec<SubdomainResult>, RustFinderError> {
-        let api_key = self.get_random_api_key().ok_or_else(|| {
-            RustFinderError::SourceError {
-                source_name: self.name.to_string(),
-                message: "No API key configured".to_string(),
+        let api_key = match self.get_random_api_key() {
+            Some(key) => key,
+            None => {
+                warn!("[{}] Pulando fonte: Nenhuma API key configurada.", self.name);
+                return Ok(Vec::new());
             }
-        })?;
+        };
 
         // Rate limiting
         session.check_rate_limit(&self.name).await?;
@@ -112,10 +120,7 @@ impl Source for VirusTotalSource {
         }
 
         let data: VirusTotalResponse = response.json().await.map_err(|e| {
-            RustFinderError::SourceError {
-                source_name: self.name.to_string(),
-                message: format!("Failed to parse response: {}", e),
-            }
+            RustFinderError::JsonParseError(e.to_string(), "Response body not available for VirusTotal JSON parsing error".to_string())
         })?;
 
         let mut results = Vec::new();

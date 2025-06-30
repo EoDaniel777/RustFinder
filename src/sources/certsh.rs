@@ -17,6 +17,12 @@ pub struct CrtShSource {
     name: String,
 }
 
+impl Default for CrtShSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CrtShSource {
     pub fn new() -> Self {
         Self { name: "crtsh".to_string() }
@@ -48,12 +54,17 @@ impl Source for CrtShSource {
             Ok(response) => {
                 let text = response.text().await
                     .map_err(|e| RustFinderError::NetworkError(e.to_string()))?;
-                
-                let crt_results: Vec<CrtShResponse> = serde_json::from_str(&text)
-                    .map_err(|e| RustFinderError::SourceError {
+
+                // Check if the response is HTML (e.g., a block page)
+                if text.trim_start().starts_with("<!DOCTYPE HTML") || text.trim_start().starts_with("<html") {
+                    return Err(RustFinderError::SourceError {
                         source_name: self.name.to_string(),
-                        message: format!("Failed to parse JSON: {}", e),
-                    })?;
+                        message: format!("Received HTML response, possibly blocked or error page. Body: {}", &text[..100.min(text.len())]),
+                    });
+                }
+
+                let crt_results: Vec<CrtShResponse> = serde_json::from_str(&text)
+                    .map_err(|e| RustFinderError::JsonParseError(e.to_string(), text))?;
 
                 let mut results = Vec::new();
                 for crt_result in crt_results {

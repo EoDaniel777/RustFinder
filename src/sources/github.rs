@@ -3,6 +3,7 @@ use crate::sources::Source;
 use crate::types::{RustFinderError, SourceInfo, SubdomainResult};
 use crate::session::Session;
 use async_trait::async_trait;
+use log::warn;
 use serde::Deserialize;
 use std::collections::HashSet;
 use regex::Regex;
@@ -40,6 +41,12 @@ pub struct GitHubSource {
     tokens: Vec<TokenInfo>,
 }
 
+impl Default for GitHubSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GitHubSource {
     pub fn new() -> Self {
         Self {
@@ -50,32 +57,17 @@ impl GitHubSource {
     }
 
     pub fn with_api_keys(mut self, keys: Vec<String>) -> Self {
-        self.api_keys = keys.clone();
-        self.tokens = keys.into_iter().map(|token| TokenInfo {
-            token,
-            rate_limit_remaining: 30, // GitHub allows 30 req/hour for code search
-            rate_limit_reset: 0,
-        }).collect();
+        self.api_keys = keys;
         self
     }
 
-    fn get_available_token(&self) -> Option<&String> {
-        // Find token with remaining rate limit
-        for token_info in &self.tokens {
-            if token_info.rate_limit_remaining > 0 {
-                return Some(&token_info.token);
-            }
-        }
-        None
-    }
-
-    fn update_rate_limit(&mut self, token: &str, remaining: i32, reset: u64) {
-        for token_info in &mut self.tokens {
-            if token_info.token == token {
-                token_info.rate_limit_remaining = remaining;
-                token_info.rate_limit_reset = reset;
-                break;
-            }
+    fn get_random_api_key(&self) -> Option<&String> {
+        if self.api_keys.is_empty() {
+            None
+        } else {
+            use rand::seq::SliceRandom;
+            let mut rng = rand::thread_rng();
+            self.api_keys.choose(&mut rng)
         }
     }
 
@@ -123,13 +115,13 @@ impl Source for GitHubSource {
     }
 
     async fn enumerate(&self, domain: &str, session: &Session) -> Result<Vec<SubdomainResult>, RustFinderError> {
-        let mut source_copy = self.clone();
-        let token = source_copy.get_available_token().ok_or_else(|| {
-            RustFinderError::SourceError {
-                source_name: self.name.to_string(),
-                message: "No API token available or rate limit exceeded".to_string(),
+        let api_key = match self.get_random_api_key() {
+            Some(key) => key,
+            None => {
+                warn!("[{}] Pulando fonte: Nenhuma API key configurada.", self.name);
+                return Ok(Vec::new());
             }
-        })?.clone();
+        };
 
         // Rate limiting
         session.check_rate_limit(&self.name).await?;
@@ -138,7 +130,7 @@ impl Source for GitHubSource {
         let mut found_subdomains: HashSet<String> = HashSet::new();
 
         // Search for the domain in code
-        let search_query = format!("{}", domain);
+        let search_query = domain.to_string();
         let url = format!(
             "https://api.github.com/search/code?q={}&sort=indexed&order=desc&per_page=100",
             urlencoding::encode(&search_query)
@@ -146,7 +138,7 @@ impl Source for GitHubSource {
 
         match session.client
             .get(&url)
-            .header("Authorization", format!("token {}", token))
+            .header("Authorization", format!("token {}", api_key))
             .header("Accept", "application/vnd.github.v3.text-match+json")
             .header("User-Agent", "RustFinder/1.0")
             .send()
@@ -162,19 +154,27 @@ impl Source for GitHubSource {
                                 .and_then(|s| s.parse::<u64>().ok())
                                 .unwrap_or(0);
                             
-                            source_copy.update_rate_limit(&token, remaining_count, reset_time);
+                            // Update rate limit for the specific token
+                            // This requires a mutable self, which is not allowed in async_trait methods directly.
+                            // For now, we'll just log it or handle it outside this function if needed.
+                            // source_copy.update_rate_limit(&api_key, remaining_count, reset_time);
                         }
                     }
                 }
 
+                let status = response.status();
                 let text = response.text().await
                     .map_err(|e| RustFinderError::NetworkError(e.to_string()))?;
 
-                let github_response: GitHubSearchResponse = serde_json::from_str(&text)
-                    .map_err(|e| RustFinderError::SourceError {
+                if !status.is_success() {
+                    return Err(RustFinderError::SourceError {
                         source_name: self.name.to_string(),
-                        message: format!("Failed to parse JSON: {}", e),
-                    })?;
+                        message: format!("GitHub API returned status: {}. Body: {}", status, text),
+                    });
+                }
+
+                let github_response: GitHubSearchResponse = serde_json::from_str(&text)
+                    .map_err(|e| RustFinderError::JsonParseError(e.to_string(), text))?;
 
                 // Extract subdomains from text matches
                 for item in github_response.items {

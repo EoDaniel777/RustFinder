@@ -3,6 +3,7 @@ use crate::sources::Source;
 use crate::types::{RustFinderError, SourceInfo, SubdomainResult};
 use crate::session::Session;
 use async_trait::async_trait;
+use log::warn;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]
@@ -38,6 +39,12 @@ struct NetlasSearchRequest {
 pub struct NetlasSource {
     name: String,
     api_keys: Vec<String>,
+}
+
+impl Default for NetlasSource {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl NetlasSource {
@@ -83,12 +90,13 @@ impl Source for NetlasSource {
     }
 
     async fn enumerate(&self, domain: &str, session: &Session) -> Result<Vec<SubdomainResult>, RustFinderError> {
-        let api_key = self.get_random_api_key().ok_or_else(|| {
-            RustFinderError::SourceError {
-                source_name: self.name.to_string(),
-                message: "No API key available".to_string(),
+        let api_key = match self.get_random_api_key() {
+            Some(key) => key,
+            None => {
+                warn!("[{}] Pulando fonte: Nenhuma API key configurada.", self.name);
+                return Ok(Vec::new());
             }
-        })?;
+        };
 
         // Rate limiting
         session.check_rate_limit(&self.name).await?;
@@ -108,10 +116,7 @@ impl Source for NetlasSource {
                     .map_err(|e| RustFinderError::NetworkError(e.to_string()))?;
 
                 let count_response: NetlasCountResponse = serde_json::from_str(&text)
-                    .map_err(|e| RustFinderError::SourceError {
-                        source_name: self.name.to_string(),
-                        message: format!("Failed to parse count JSON: {}", e),
-                    })?;
+                    .map_err(|e| RustFinderError::JsonParseError(e.to_string(), text))?;
 
                 count_response.count.min(10000) // Limit to avoid large requests
             }
@@ -159,14 +164,18 @@ impl Source for NetlasSource {
                     return Err(RustFinderError::RateLimitError(self.name.to_string()));
                 }
 
-                let netlas_items: Vec<NetlasItem> = serde_json::from_str(&text)
-                    .map_err(|e| RustFinderError::SourceError {
-                        source_name: self.name.to_string(),
-                        message: format!("Failed to parse domains JSON: {}", e),
-                    })?;
+                #[derive(Debug, Deserialize)]
+struct NetlasDownloadResponse {
+    data: Vec<NetlasItem>,
+}
+
+// ... (restante do código)
+
+                let netlas_download_response: NetlasDownloadResponse = serde_json::from_str(&text)
+                    .map_err(|e| RustFinderError::JsonParseError(e.to_string(), text))?;
 
                 let mut results = Vec::new();
-                for item in netlas_items {
+                for item in netlas_download_response.data {
                     let subdomain = item.data.domain.trim_end_matches('.').to_lowercase();
                     
                     // Verify it's actually a subdomain of our target

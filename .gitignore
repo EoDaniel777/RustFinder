@@ -31,4 +31,3 @@ Thumbs.db
 
 # Keep example files
 !.env
-!config.toml

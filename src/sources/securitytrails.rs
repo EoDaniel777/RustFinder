@@ -1,8 +1,9 @@
 // src/sources/securitytrails.rs
+use crate::session::Session;
 use crate::sources::Source;
 use crate::types::{RustFinderError, SourceInfo, SubdomainResult};
-use crate::session::Session;
 use async_trait::async_trait;
+use log::warn;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -26,6 +27,12 @@ struct SecurityTrailsRecord {
 pub struct SecurityTrailsSource {
     name: String,
     api_keys: Vec<String>,
+}
+
+impl Default for SecurityTrailsSource {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SecurityTrailsSource {
@@ -71,12 +78,13 @@ impl Source for SecurityTrailsSource {
     }
 
     async fn enumerate(&self, domain: &str, session: &Session) -> Result<Vec<SubdomainResult>, RustFinderError> {
-        let api_key = self.get_random_api_key().ok_or_else(|| {
-            RustFinderError::SourceError {
-                source_name: self.name.to_string(),
-                message: "No API key available".to_string(),
+        let api_key = match self.get_random_api_key() {
+            Some(key) => key,
+            None => {
+                warn!("[{}] Pulando fonte: Nenhuma API key configurada.", self.name);
+                return Ok(Vec::new());
             }
-        })?;
+        };
 
         // Rate limiting
         session.check_rate_limit(&self.name).await?;
@@ -89,13 +97,20 @@ impl Source for SecurityTrailsSource {
             let url = if let Some(ref sid) = scroll_id {
                 format!("https://api.securitytrails.com/v1/scroll/{}", sid)
             } else {
-                format!("https://api.securitytrails.com/v1/domains/list?include_ips=false&scroll=true")
+                "https://api.securitytrails.com/v1/domains/list?include_ips=false&scroll=true".to_string()
             };
 
             let response_result = if scroll_id.is_none() {
                 // Initial request with POST
                 let body = format!(r#"{{"query":"apex_domain='{}'"}}"#, domain);
-                session.post(&url, body).await
+                session.client
+                    .post(&url)
+                    .header("APIKEY", api_key)
+                    .header("Content-Type", "application/json")
+                    .body(body)
+                    .send()
+                    .await
+                    .map_err(|e| RustFinderError::NetworkError(e.to_string()))
             } else {
                 // Subsequent requests with GET
                 session.client
@@ -113,10 +128,7 @@ impl Source for SecurityTrailsSource {
                         .map_err(|e| RustFinderError::NetworkError(e.to_string()))?;
 
                     let st_response: SecurityTrailsResponse = serde_json::from_str(&text)
-                        .map_err(|e| RustFinderError::SourceError {
-                            source_name: self.name.to_string(),
-                            message: format!("Failed to parse JSON: {}", e),
-                        })?;
+                        .map_err(|e| RustFinderError::JsonParseError(e.to_string(), text.clone()))?;
 
                     // Process records from scroll API
                     if let Some(records) = st_response.records {
@@ -172,10 +184,7 @@ impl Source for SecurityTrailsSource {
                                     .map_err(|e| RustFinderError::NetworkError(e.to_string()))?;
 
                                 let fallback_response: SecurityTrailsResponse = serde_json::from_str(&text)
-                                    .map_err(|e| RustFinderError::SourceError {
-                                        source_name: self.name.to_string(),
-                                        message: format!("Failed to parse fallback JSON: {}", e),
-                                    })?;
+                                    .map_err(|e| RustFinderError::JsonParseError(e.to_string(), text))?;
 
                                 if let Some(subdomains) = fallback_response.subdomains {
                                     for subdomain in subdomains {

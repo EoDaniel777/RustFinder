@@ -3,7 +3,6 @@ use crate::types::{OutputFormat, OutputConfig, RustFinderError, SubdomainResult,
 use std::io::Write;
 use std::fs::File;
 use std::path::Path;
-use serde_json;
 
 pub struct OutputManager {
     config: OutputConfig,

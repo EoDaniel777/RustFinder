@@ -1,11 +1,13 @@
-use anyhow::Result;use clap::Parser;use log::{error, info};use std::process;use std::io::{self, BufRead};mod cli;mod config;mod engine;mod error;mod output;mod resolver;mod session;mod sources;mod types;mod updater;mod utils;use cli::Args;use engine::RustFinderEngine;use types::Config;const BANNER: &str = r#"    ____             __  ______ _           __         
-   / __ \__  _______/ /_/ ____/(_)___  ____/ /__  _____
-  / /_/ / / / / ___/ __/ /_  / / __ \/ __  / _ \/ ___/
- / _, _/ /_/ (__  ) /_/ __/ / / / / / /_/ /  __/ /    
-/_/ |_|\__,_/____/\__/_/   /_/_/_/ /_\__,_/\___/_/     
+use anyhow::Result;use clap::Parser;use log::{error, info};use std::process;use std::io::{self, BufRead};mod cli;mod config;mod engine;mod error;mod output;mod resolver;mod session;mod sources;mod types;mod updater;mod utils;use cli::Args;use engine::RustFinderEngine;use types::Config;const BANNER: &str = r#"
+
+        ██████╗ ██╗   ██╗███████╗████████╗███████╗██╗███╗   ██╗██████╗ ███████╗██████╗ 
+        ██╔══██╗██║   ██║██╔════╝╚══██╔══╝██╔════╝██║████╗  ██║██╔══██╗██╔════╝██╔══██╗
+        ██████╔╝██║   ██║███████╗   ██║   █████╗  ██║██╔██╗ ██║██║  ██║█████╗  ██████╔╝
+        ██╔══██╗██║   ██║╚════██║   ██║   ██╔══╝  ██║██║╚██╗██║██║  ██║██╔══╝  ██╔══██╗
+        ██║  ██║╚██████╔╝███████║   ██║   ██║     ██║██║ ╚████║██████╔╝███████╗██║  ██║
+        ╚═╝  ╚═╝ ╚═════╝ ╚══════╝   ╚═╝   ╚═╝     ╚═╝╚═╝  ╚═══╝╚═════╝ ╚══════╝╚═╝  ╚═╝
 
         Fast Passive Subdomain Enumeration
-              Made with ❤️  and 🦀
          Authors: Daniel Alisom
 "#;#[tokio::main]async fn main() -> Result<()> {
     env_logger::Builder::from_default_env()
@@ -18,13 +20,14 @@ use anyhow::Result;use clap::Parser;use log::{error, info};use std::process;use 
         list_sources();
         return Ok(());
     }    if args.update {
-        return Ok(updater::check_and_update().await.map_err(|e| anyhow::anyhow!(e))?);
+        return updater::check_and_update().await.map_err(|e| anyhow::anyhow!(e));
     }    let domains = get_domains_from_args(&args); 
     if domains.is_empty() && !args.use_stdin() {
         error!("No input provided. Use -d <domain>, -l <file>, or pipe domains to stdin");
         process::exit(1);
     }
-    let mut engine = RustFinderEngine::new(args.clone()).await?;
+    let config_path = args.config_path.clone().unwrap_or_else(|| "config.toml".to_string());
+    let mut engine = RustFinderEngine::new(args.clone(), &config_path).await?;
 
     let stats = engine.run(domains).await.map_err(|e| anyhow::anyhow!("Enumeration failed: {}", e))?;
 
@@ -96,7 +99,7 @@ use anyhow::Result;use clap::Parser;use log::{error, info};use std::process;use 
             }
         }
     }    // Read from stdin if available
-    if atty::is(atty::Stream::Stdin) {
+    if !atty::is(atty::Stream::Stdin) {
         let stdin = io::stdin();
         for line in stdin.lock().lines() {
             if let Ok(domain) = line {

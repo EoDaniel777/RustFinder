@@ -3,19 +3,24 @@ use crate::sources::Source;
 use crate::types::{RustFinderError, SourceInfo, SubdomainResult};
 use crate::session::Session;
 use async_trait::async_trait;
+use log::warn;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 struct ChaosResponse {
-    domain: String,
     subdomains: Vec<String>,
-    count: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ChaosSource {
     name: String,
     api_keys: Vec<String>,
+}
+
+impl Default for ChaosSource {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ChaosSource {
@@ -61,12 +66,13 @@ impl Source for ChaosSource {
     }
 
     async fn enumerate(&self, domain: &str, session: &Session) -> Result<Vec<SubdomainResult>, RustFinderError> {
-        let api_key = self.get_random_api_key().ok_or_else(|| {
-            RustFinderError::SourceError {
-                source_name: self.name.to_string(),
-                message: "No API key available".to_string(),
+        let api_key = match self.get_random_api_key() {
+            Some(key) => key,
+            None => {
+                warn!("[{}] Pulando fonte: Nenhuma API key configurada.", self.name);
+                return Ok(Vec::new());
             }
-        })?;
+        };
 
         // Rate limiting
         session.check_rate_limit(&self.name).await?;
@@ -75,7 +81,7 @@ impl Source for ChaosSource {
 
         match session.client
             .get(&url)
-            .header("Authorization", api_key)
+            .header("X-API-Key", api_key)
             .header("Accept", "application/json")
             .send()
             .await {
@@ -84,10 +90,7 @@ impl Source for ChaosSource {
                     .map_err(|e| RustFinderError::NetworkError(e.to_string()))?;
 
                 let chaos_response: ChaosResponse = serde_json::from_str(&text)
-                    .map_err(|e| RustFinderError::SourceError {
-                        source_name: self.name.to_string(),
-                        message: format!("Failed to parse JSON: {}", e),
-                    })?;
+                    .map_err(|e| RustFinderError::JsonParseError(e.to_string(), text))?;
 
                 let mut results = Vec::new();
                 for subdomain in chaos_response.subdomains {

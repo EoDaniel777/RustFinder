@@ -11,6 +11,8 @@ mod chaos;
 mod github;
 mod netlas;
 mod stubs;
+mod certsh;
+mod hackertarget;
 
 // Re-exportar as implementações específicas
 pub use virustotal::VirusTotalSource;
@@ -19,6 +21,8 @@ pub use shodan::ShodanSource;
 pub use chaos::ChaosSource;
 pub use github::GitHubSource;
 pub use netlas::NetlasSource;
+pub use certsh::CrtShSource;
+pub use hackertarget::HackerTargetSource;
 
 // Definir a trait Source
 #[async_trait]
@@ -61,6 +65,14 @@ pub fn create_source(name: &str, config: &Config) -> Option<Box<dyn Source>> {
             let source = NetlasSource::new().with_api_keys(api_keys);
             Some(Box::new(source))
         },
+        "crtsh" => {
+            let source = CrtShSource::new();
+            Some(Box::new(source))
+        },
+        "hackertarget" => {
+            let source = HackerTargetSource::new();
+            Some(Box::new(source))
+        },
         _ => None,
     }
 }
@@ -74,6 +86,8 @@ pub fn get_all_sources(config: &Config) -> Vec<Box<dyn Source>> {
         "chaos",
         "github",
         "netlas",
+        "crtsh",
+        "hackertarget",
     ]
     .into_iter()
     .filter_map(|name| create_source(name, config))

@@ -1,8 +1,9 @@
 // src/sources/shodan.rs
+use crate::session::Session;
 use crate::sources::Source;
 use crate::types::{RustFinderError, SourceInfo, SubdomainResult};
-use crate::session::Session;
 use async_trait::async_trait;
+use log::warn;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -18,6 +19,12 @@ struct ShodanResponse {
 pub struct ShodanSource {
     name: String,
     api_keys: Vec<String>,
+}
+
+impl Default for ShodanSource {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ShodanSource {
@@ -63,12 +70,13 @@ impl Source for ShodanSource {
     }
 
     async fn enumerate(&self, domain: &str, session: &Session) -> Result<Vec<SubdomainResult>, RustFinderError> {
-        let api_key = self.get_random_api_key().ok_or_else(|| {
-            RustFinderError::SourceError {
-                source_name: self.name.to_string(),
-                message: "No API key available".to_string(),
+        let api_key = match self.get_random_api_key() {
+            Some(key) => key,
+            None => {
+                warn!("[{}] Pulando fonte: Nenhuma API key configurada.", self.name);
+                return Ok(Vec::new());
             }
-        })?;
+        };
 
         // Rate limiting
         session.check_rate_limit(&self.name).await?;
@@ -81,14 +89,19 @@ impl Source for ShodanSource {
             
             match session.get(&url).await {
                 Ok(response) => {
+                    let status = response.status();
                     let text = response.text().await
                         .map_err(|e| RustFinderError::NetworkError(e.to_string()))?;
 
-                    let shodan_response: ShodanResponse = serde_json::from_str(&text)
-                        .map_err(|e| RustFinderError::SourceError {
+                    if !status.is_success() {
+                        return Err(RustFinderError::SourceError {
                             source_name: self.name.to_string(),
-                            message: format!("Failed to parse JSON: {}", e),
-                        })?;
+                            message: format!("Shodan API returned status: {}. Body: {}", status, text),
+                        });
+                    }
+
+                    let shodan_response: ShodanResponse = serde_json::from_str(&text)
+                        .map_err(|e| RustFinderError::JsonParseError(e.to_string(), text))?;
 
                     // Check for API errors
                     if let Some(error) = shodan_response.error {

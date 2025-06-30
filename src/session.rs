@@ -19,7 +19,7 @@ impl Session {
         // Build HTTP client
         let mut client_builder = Client::builder()
             .timeout(config.timeout)
-            .user_agent(&config.user_agent)
+            .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
             .gzip(true)
             .deflate(true) // Use deflate instead of brotli
             .connect_timeout(Duration::from_secs(10))
@@ -99,18 +99,11 @@ impl Session {
         T: serde::de::DeserializeOwned,
     {
         let response = self.get(url).await?;
-        
-        if !response.status().is_success() {
-            return Err(RustFinderError::NetworkError(format!(
-                "HTTP error: {}",
-                response.status()
-            )));
-        }
+        let text = response.text().await.map_err(|e| RustFinderError::NetworkError(e.to_string()))?;
 
-        response
-            .json::<T>()
-            .await
-            .map_err(|e| RustFinderError::ParseError(e.to_string()))
+        serde_json::from_str(&text).map_err(|e| {
+            RustFinderError::JsonParseError(e.to_string(), text)
+        })
     }
 
     pub async fn post(&self, url: &str, body: String) -> Result<reqwest::Response, RustFinderError> {

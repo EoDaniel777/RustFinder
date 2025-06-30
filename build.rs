@@ -4,7 +4,7 @@ fn main() {
     
     // Add git commit hash if available
     if let Ok(output) = std::process::Command::new("git")
-        .args(&["rev-parse", "--short", "HEAD"])
+        .args(["rev-parse", "--short", "HEAD"])
         .output()
     {
         if output.status.success() {
@@ -17,7 +17,7 @@ fn main() {
     
     // Add git branch if available
     if let Ok(output) = std::process::Command::new("git")
-        .args(&["rev-parse", "--abbrev-ref", "HEAD"])
+        .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .output()
     {
         if output.status.success() {
