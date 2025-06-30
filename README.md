@@ -18,7 +18,7 @@ RustFinder é uma ferramenta de enumeração de subdomínios passiva de alto des
 
 - 🚀 **Alto Desempenho**: Async/await com Tokio para enumeração concorrente
 - 🔒 **Segurança de Memória**: Construído com as garantias de segurança do Rust
-- 🌐 **Mais de 40 Fontes**: Suporta as principais fontes como CRT.sh, VirusTotal, SecurityTrails, etc.
+- 🌐 **Suportará mais de 40 Fontes futuramente**: Suporta as principais fontes como CRT.sh, VirusTotal, SecurityTrails, etc.
 - 🔑 **Suporte a API**: Chaves de API configuráveis para limites de taxa aprimorados
 - 🎯 **Verificação Ativa**: Resolução de DNS opcional para verificar subdomínios
 - 🦆 **Detecção de Curinga**: Detecção e filtragem inteligente de DNS curinga
