@@ -4,7 +4,7 @@
 
 [![Rust](https://img.shields.io/badge/language-Rust-orange.svg)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/rustfinder/rustfinder)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/EoDaniel777/RustFinder/actions/runs/15987046730)
 
 <!-- Espaço reservado para a captura de tela -->
 ![RustFinder Screenshot](assets/logo.png)
