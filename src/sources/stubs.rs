@@ -1,12 +1,10 @@
 // src/sources/stubs.rs
-// Este arquivo contém stubs vazios para sources que ainda não foram implementados
 
 use crate::sources::Source;
 use crate::types::{RustFinderError, SourceInfo, SubdomainResult};
 use crate::session::Session;
 use async_trait::async_trait;
 
-// Macro para criar stubs rapidamente
 macro_rules! create_stub_source {
     ($name:ident, $source_name:expr) => {
         #[derive(Debug, Clone)]
@@ -41,7 +39,7 @@ macro_rules! create_stub_source {
             }
 
             async fn enumerate(&self, _domain: &str, _session: &Session) -> Result<Vec<SubdomainResult>, RustFinderError> {
-                // Stub - not implemented yet
+
                 Ok(vec![])
             }
         }

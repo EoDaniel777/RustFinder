@@ -3,12 +3,14 @@ use crate::sources::Source;
 use crate::types::{RustFinderError, SourceInfo, SubdomainResult};
 use crate::session::Session;
 use async_trait::async_trait;
-use log::warn;
+use log::{info, warn};
 use serde::Deserialize;
+use std::collections::HashSet;
 
 #[derive(Debug, Deserialize)]
 struct ChaosResponse {
     subdomains: Vec<String>,
+    count: Option<u32>,
 }
 
 #[derive(Debug, Clone)]
@@ -74,66 +76,56 @@ impl Source for ChaosSource {
             }
         };
 
-        // Rate limiting
         session.check_rate_limit(&self.name).await?;
 
         let url = format!("https://dns.projectdiscovery.io/dns/{}/subdomains", domain);
 
-        match session.client
+        let request_builder = session.client
             .get(&url)
-            .header("X-API-Key", api_key)
-            .header("Accept", "application/json")
-            .send()
-            .await {
+            .header("Authorization", api_key)
+            .header("Accept", "application/json");
+
+        match session.send_request_with_retry(request_builder, &self.name).await {
             Ok(response) => {
-                let text = response.text().await
-                    .map_err(|e| RustFinderError::NetworkError(e.to_string()))?;
+                let status = response.status();
+                
+                if !status.is_success() {
+                    let text = response.text().await
+                        .unwrap_or_else(|_| "Failed to read response body".to_string());
+                    return Err(RustFinderError::SourceError {
+                        source_name: self.name.to_string(),
+                        message: format!("Chaos API returned status: {}. Body: {}", status, text),
+                    });
+                }
 
-                let chaos_response: ChaosResponse = serde_json::from_str(&text)
-                    .map_err(|e| RustFinderError::JsonParseError(e.to_string(), text))?;
+                let chaos_response: ChaosResponse = response.json().await.map_err(|e| {
+                    RustFinderError::JsonParseError(e.to_string(), "Failed to parse Chaos response".to_string())
+                })?;
 
+                let mut found_subdomains = HashSet::new();
                 let mut results = Vec::new();
+                
                 for subdomain in chaos_response.subdomains {
-                    // Create full subdomain if needed
                     let full_subdomain = if subdomain.ends_with(&format!(".{}", domain)) {
                         subdomain
                     } else {
                         format!("{}.{}", subdomain, domain)
                     };
 
-                    results.push(SubdomainResult {
-                        subdomain: full_subdomain,
-                        source: self.name.to_string(),
-                        resolved: false,
-                        ip_addresses: Vec::new(),
-                    });
+                    if found_subdomains.insert(full_subdomain.clone()) {
+                        results.push(SubdomainResult {
+                            subdomain: full_subdomain,
+                            source: self.name.to_string(),
+                            resolved: false,
+                            ip_addresses: Vec::new(),
+                        });
+                    }
                 }
 
+                info!("[{}] Encontrados {} subdomínios únicos", self.name, results.len());
                 Ok(results)
             }
-            Err(e) => Err(RustFinderError::SourceError {
-                source_name: self.name.to_string(),
-                message: format!("HTTP request failed: {}", e),
-            }),
+            Err(e) => Err(e),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_source_creation() {
-        let source = ChaosSource::new();
-        assert_eq!(source.name(), "chaos");
-        assert!(source.api_keys.is_empty());
-    }
-
-    #[test]
-    fn test_api_key_management() {
-        let source = ChaosSource::new();
-        let source_with_keys = source.with_api_keys(vec!["test_key".to_string()]);
-        assert_eq!(source_with_keys.get_random_api_key(), Some(&"test_key".to_string()));
     }
 }

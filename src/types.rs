@@ -14,6 +14,8 @@ pub struct Config {
     pub output: OutputConfig,
     pub resolver: ResolverConfig,
     pub sources: Vec<String>,
+    pub retry_attempts: u32,
+    pub retry_delay_ms: u64,
 }
 
 impl Default for Config {
@@ -42,6 +44,8 @@ impl Default for Config {
                 "github".to_string(),
                 "netlas".to_string(),
             ],
+            retry_attempts: 3,
+            retry_delay_ms: 500,
         }
     }
 }
@@ -169,6 +173,12 @@ pub enum RustFinderError {
 
     #[error("Timeout error: {0}")]
     TimeoutError(String),
+
+    #[error("Rate limit exceeded for {source_name}: {message}")]
+    RateLimitExceeded {
+        source_name: String,
+        message: String,
+    },
 
     #[error("Unknown error: {0}")]
     Unknown(#[from] anyhow::Error),

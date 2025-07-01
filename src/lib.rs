@@ -9,11 +9,9 @@ pub mod sources;
 pub mod types;
 pub mod utils;
 
-// Re-export important types
 pub use cli::Args;
 pub use engine::RustFinderEngine;
 pub use types::{Config, RustFinderError, SubdomainResult, DomainReport};
 
-// Version information
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const NAME: &str = env!("CARGO_PKG_NAME");

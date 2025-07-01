@@ -22,7 +22,6 @@ impl Resolver {
         } else {
             let mut resolver_config = DnsResolverConfig::new();
             
-            // Add custom nameservers
             for ns in &config.nameservers {
                 let socket_addr = SocketAddr::from_str(ns)
                     .map_err(|e| RustFinderError::ConfigError(format!("Invalid nameserver address {}: {}", ns, e)))?;

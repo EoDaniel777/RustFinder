@@ -7,14 +7,12 @@ use std::fs::File;
 use std::io::{self, BufReader, BufRead};
 use std::path::PathBuf;
 
-/// Reads lines from a file into a vector of strings.
 pub fn read_lines(path: &PathBuf) -> io::Result<Vec<String>> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
     reader.lines().collect()
 }
 
-/// Extract domain from URL
 pub fn extract_domain_from_url(url_str: &str) -> Result<String, RustFinderError> {
     let url = Url::parse(url_str)
         .map_err(|e| RustFinderError::InvalidDomain(format!("Invalid URL: {}", e)))?;
@@ -24,7 +22,6 @@ pub fn extract_domain_from_url(url_str: &str) -> Result<String, RustFinderError>
         .map(|s| s.to_string())
 }
 
-/// Check if a string is a valid domain
 pub fn is_valid_domain(domain: &str) -> bool {
     if domain.is_empty() || domain.len() > 253 {
         return false;
@@ -52,7 +49,6 @@ pub fn is_valid_domain(domain: &str) -> bool {
     true
 }
 
-/// Extract subdomains from text using regex
 pub fn extract_subdomains_from_text(text: &str, domain: &str) -> Result<Vec<String>, RustFinderError> {
     let pattern = format!(
         r"(?i)(?:^|[^a-zA-Z0-9.-])([a-zA-Z0-9](?:[a-zA-Z0-9-]{{0,61}}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{{0,61}}[a-zA-Z0-9])?)*\.{})",
@@ -76,16 +72,13 @@ pub fn extract_subdomains_from_text(text: &str, domain: &str) -> Result<Vec<Stri
     Ok(subdomains.into_iter().collect())
 }
 
-/// Clean and normalize a subdomain
 pub fn clean_subdomain(subdomain: &str, domain: &str) -> String {
     let mut cleaned = subdomain.trim().to_lowercase();
     
-    // Remove trailing dots
     while cleaned.ends_with('.') {
         cleaned.pop();
     }
     
-    // Ensure it ends with the domain
     if !cleaned.ends_with(domain) && !cleaned.is_empty() {
         cleaned = format!("{}.{}", cleaned, domain);
     }
@@ -93,7 +86,6 @@ pub fn clean_subdomain(subdomain: &str, domain: &str) -> String {
     cleaned
 }
 
-/// Parse wildcard patterns
 pub fn parse_wildcard(pattern: &str) -> Result<Regex, RustFinderError> {
     if !pattern.contains('*') {
         return Err(RustFinderError::InvalidDomain(
@@ -110,7 +102,6 @@ pub fn parse_wildcard(pattern: &str) -> Result<Regex, RustFinderError> {
         ))
 }
 
-/// Filter subdomains by wildcard pattern
 pub fn filter_by_wildcard(subdomains: Vec<String>, pattern: &str) -> Result<Vec<String>, RustFinderError> {
     let re = parse_wildcard(pattern)?;
     
@@ -120,7 +111,6 @@ pub fn filter_by_wildcard(subdomains: Vec<String>, pattern: &str) -> Result<Vec<
         .collect())
 }
 
-/// Remove duplicate subdomains (case-insensitive)
 pub fn deduplicate_subdomains(subdomains: Vec<String>) -> Vec<String> {
     let mut seen = HashSet::new();
     let mut unique = Vec::new();
@@ -135,7 +125,6 @@ pub fn deduplicate_subdomains(subdomains: Vec<String>) -> Vec<String> {
     unique
 }
 
-/// Sort subdomains by level (depth)
 pub fn sort_by_level(mut subdomains: Vec<String>) -> Vec<String> {
     subdomains.sort_by(|a, b| {
         let a_parts = a.split('.').count();
@@ -146,12 +135,10 @@ pub fn sort_by_level(mut subdomains: Vec<String>) -> Vec<String> {
     subdomains
 }
 
-/// Get terminal width
 pub fn terminal_width() -> usize {
     term_size::dimensions().map(|(w, _)| w).unwrap_or(80)
 }
 
-/// Create a progress bar message
 pub fn progress_message(current: usize, total: usize, message: &str) -> String {
     let _width = terminal_width();
     let progress_width = 20;

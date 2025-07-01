@@ -35,7 +35,7 @@ use anyhow::Result;use clap::Parser;use log::{error, info};use std::process;use 
         info!(
             "Enumeration completed: {} subdomains found from {} sources in {:.2}s",
             stats.unique_subdomains,
-            stats.sources_used.len(), // Corrected to use length of sources_used
+            stats.sources_used.len(),
             stats.duration.as_secs_f64()
         );
     }
@@ -43,7 +43,7 @@ use anyhow::Result;use clap::Parser;use log::{error, info};use std::process;use 
     Ok(())
 }fn list_sources() {    println!("Available sources:\n");
 
-    let config = Config::default(); // Create a default config for listing sources
+    let config = Config::default();
     let sources = sources::get_all_sources(&config);
     let mut default_sources = Vec::new();
     let mut api_sources = Vec::new();
@@ -98,7 +98,7 @@ use anyhow::Result;use clap::Parser;use log::{error, info};use std::process;use 
                 error!("Failed to read domains from file {:?}: {}", file_path, e);
             }
         }
-    }    // Read from stdin if available
+    }
     if !atty::is(atty::Stream::Stdin) {
         let stdin = io::stdin();
         for line in stdin.lock().lines() {

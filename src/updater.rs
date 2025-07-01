@@ -23,7 +23,6 @@ struct GitHubAsset {
     size: u64,
 }
 
-/// Check for updates and optionally install them
 pub async fn check_and_update() -> Result<(), RustFinderError> {
     info!("Checking for updates...");
     
@@ -49,7 +48,6 @@ pub async fn check_and_update() -> Result<(), RustFinderError> {
     Ok(())
 }
 
-/// Check if a newer version is available
 async fn check_for_updates() -> Result<Option<String>, RustFinderError> {
     let client = reqwest::Client::new();
     
@@ -80,7 +78,6 @@ async fn check_for_updates() -> Result<Option<String>, RustFinderError> {
     }
 }
 
-/// Compare version strings to determine if update is needed
 fn is_newer_version(latest: &str, current: &str) -> bool {
     use std::cmp::Ordering;
     
@@ -99,18 +96,15 @@ fn is_newer_version(latest: &str, current: &str) -> bool {
     }
 }
 
-/// Determine if auto-update should be performed
 fn should_auto_update() -> bool {
-    // Check environment variable
+
     if let Ok(auto_update) = env::var("RUSTFINDER_AUTO_UPDATE") {
         return auto_update.to_lowercase() == "true" || auto_update == "1";
     }
     
-    // Default to false for security
     false
 }
 
-/// Perform the actual update using self_update crate
 async fn perform_update() -> Result<(), RustFinderError> {
     #[cfg(feature = "self-update")]
     {
@@ -140,7 +134,6 @@ async fn perform_update() -> Result<(), RustFinderError> {
     }
 }
 
-/// Get update information without installing
 pub async fn get_update_info() -> Result<Option<UpdateInfo>, RustFinderError> {
     let client = reqwest::Client::new();
     
@@ -174,7 +167,6 @@ pub async fn get_update_info() -> Result<Option<UpdateInfo>, RustFinderError> {
     }
 }
 
-/// Information about available updates
 #[derive(Debug)]
 pub struct UpdateInfo {
     pub current_version: String,
@@ -183,7 +175,6 @@ pub struct UpdateInfo {
     pub download_url: String,
 }
 
-/// Show update information in a user-friendly format
 pub fn display_update_info(info: &UpdateInfo) {
     println!("🦀 RustFinder Update Available!");
     println!("Current version: {}", info.current_version);
@@ -212,25 +203,22 @@ mod tests {
 
     #[test]
     fn test_should_auto_update() {
-        // Test default behavior
+
         env::remove_var("RUSTFINDER_AUTO_UPDATE");
         assert!(!should_auto_update());
         
-        // Test enabled
         env::set_var("RUSTFINDER_AUTO_UPDATE", "true");
         assert!(should_auto_update());
         
         env::set_var("RUSTFINDER_AUTO_UPDATE", "1");
         assert!(should_auto_update());
         
-        // Test disabled
         env::set_var("RUSTFINDER_AUTO_UPDATE", "false");
         assert!(!should_auto_update());
         
         env::set_var("RUSTFINDER_AUTO_UPDATE", "0");
         assert!(!should_auto_update());
         
-        // Cleanup
         env::remove_var("RUSTFINDER_AUTO_UPDATE");
     }
 }

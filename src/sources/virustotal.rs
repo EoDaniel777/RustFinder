@@ -93,7 +93,6 @@ impl Source for VirusTotalSource {
             }
         };
 
-        // Rate limiting
         session.check_rate_limit(&self.name).await?;
 
         let url = format!(
@@ -101,23 +100,8 @@ impl Source for VirusTotalSource {
             domain
         );
 
-        let response = session
-            .client
-            .get(&url)
-            .header("x-apikey", api_key)
-            .send()
-            .await
-            .map_err(|e| RustFinderError::SourceError {
-                source_name: self.name.to_string(),
-                message: format!("Request failed: {}", e),
-            })?;
-
-        if !response.status().is_success() {
-            return Err(RustFinderError::SourceError {
-                source_name: self.name.to_string(),
-                message: format!("API returned status: {}", response.status()),
-            });
-        }
+        let request_builder = session.client.get(&url).header("x-apikey", api_key);
+        let response = session.send_request_with_retry(request_builder, &self.name).await?;
 
         let data: VirusTotalResponse = response.json().await.map_err(|e| {
             RustFinderError::JsonParseError(e.to_string(), "Response body not available for VirusTotal JSON parsing error".to_string())

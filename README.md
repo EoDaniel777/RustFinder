@@ -246,7 +246,7 @@ Contribuições são bem-vindas! Sinta-se à vontade para enviar um Pull Request
 
 ## Licença
 
-O RustFinder está licenciado sob a Licença MIT. Veja [LICENSE](LICENSE) para mais informações.
+O RustFinder está licenciado sob a Licença MIT.
 
 ## Agradecimentos
 

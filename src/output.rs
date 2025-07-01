@@ -22,7 +22,7 @@ impl OutputManager {
     }
 
     async fn write_to_file(&self, file_path: &str, report: &DomainReport) -> Result<(), RustFinderError> {
-        // Create directory if it doesn't exist
+
         if let Some(parent) = Path::new(file_path).parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|e| RustFinderError::OutputError(format!("Failed to create directory: {}", e)))?;
@@ -97,7 +97,7 @@ impl OutputManager {
     }
 
     fn write_csv_output<W: Write>(&self, writer: &mut W, report: &DomainReport) -> Result<(), RustFinderError> {
-        // Write CSV header
+
         if self.config.include_ips {
             writeln!(writer, "subdomain,source,resolved,ip_addresses")
                 .map_err(|e| RustFinderError::OutputError(e.to_string()))?;
@@ -106,7 +106,6 @@ impl OutputManager {
                 .map_err(|e| RustFinderError::OutputError(e.to_string()))?;
         }
 
-        // Write CSV rows
         for subdomain in &report.subdomains {
             if self.config.include_ips {
                 writeln!(

@@ -3,24 +3,20 @@ use crate::session::Session;
 use crate::sources::Source;
 use crate::types::{RustFinderError, SourceInfo, SubdomainResult};
 use async_trait::async_trait;
-use log::warn;
+use log::{info, warn};
 use serde::Deserialize;
+use std::collections::HashSet;
 
 #[derive(Debug, Deserialize)]
 struct SecurityTrailsResponse {
     meta: Option<SecurityTrailsMeta>,
-    records: Option<Vec<SecurityTrailsRecord>>,
     subdomains: Option<Vec<String>>,
+    subdomain_count: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
 struct SecurityTrailsMeta {
-    scroll_id: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct SecurityTrailsRecord {
-    hostname: String,
+    limit_reached: Option<bool>,
 }
 
 #[derive(Debug, Clone)]
@@ -86,71 +82,42 @@ impl Source for SecurityTrailsSource {
             }
         };
 
-        // Rate limiting
         session.check_rate_limit(&self.name).await?;
 
-        let mut results = Vec::new();
-        let mut scroll_id: Option<String> = None;
+        let url = format!("https://api.securitytrails.com/v1/domain/{}/subdomains", domain);
+        
+        let request_builder = session.client
+            .get(&url)
+            .header("APIKEY", api_key)
+            .header("Accept", "application/json");
 
-        // Try the scroll API first
-        loop {
-            let url = if let Some(ref sid) = scroll_id {
-                format!("https://api.securitytrails.com/v1/scroll/{}", sid)
-            } else {
-                "https://api.securitytrails.com/v1/domains/list?include_ips=false&scroll=true".to_string()
-            };
-
-            let response_result = if scroll_id.is_none() {
-                // Initial request with POST
-                let body = format!(r#"{{"query":"apex_domain='{}'"}}"#, domain);
-                session.client
-                    .post(&url)
-                    .header("APIKEY", api_key)
-                    .header("Content-Type", "application/json")
-                    .body(body)
-                    .send()
-                    .await
-                    .map_err(|e| RustFinderError::NetworkError(e.to_string()))
-            } else {
-                // Subsequent requests with GET
-                session.client
-                    .get(&url)
-                    .header("APIKEY", api_key)
-                    .header("Content-Type", "application/json")
-                    .send()
-                    .await
-                    .map_err(|e| RustFinderError::NetworkError(e.to_string()))
-            };
-
-            match response_result {
-                Ok(response) => {
+        match session.send_request_with_retry(request_builder, &self.name).await {
+            Ok(response) => {
+                let status = response.status();
+                
+                if !status.is_success() {
                     let text = response.text().await
-                        .map_err(|e| RustFinderError::NetworkError(e.to_string()))?;
+                        .unwrap_or_else(|_| "Failed to read response body".to_string());
+                    return Err(RustFinderError::SourceError {
+                        source_name: self.name.to_string(),
+                        message: format!("SecurityTrails API returned status: {}. Body: {}", status, text),
+                    });
+                }
 
-                    let st_response: SecurityTrailsResponse = serde_json::from_str(&text)
-                        .map_err(|e| RustFinderError::JsonParseError(e.to_string(), text.clone()))?;
+                let text = response.text().await
+                    .map_err(|e| RustFinderError::NetworkError(e.to_string()))?;
 
-                    // Process records from scroll API
-                    if let Some(records) = st_response.records {
-                        for record in records {
-                            results.push(SubdomainResult {
-                                subdomain: record.hostname,
-                                source: self.name.to_string(),
-                                resolved: false,
-                                ip_addresses: Vec::new(),
-                            });
-                        }
-                    }
+                let st_response: SecurityTrailsResponse = serde_json::from_str(&text)
+                    .map_err(|e| RustFinderError::JsonParseError(e.to_string(), text))?;
 
-                    // Process subdomains from regular API
-                    if let Some(subdomains) = st_response.subdomains {
-                        for subdomain in subdomains {
-                            let full_subdomain = if subdomain.ends_with('.') {
-                                format!("{}{}", subdomain, domain)
-                            } else {
-                                format!("{}.{}", subdomain, domain)
-                            };
-                            
+                let mut found_subdomains = HashSet::new();
+                let mut results = Vec::new();
+
+                if let Some(subdomains) = st_response.subdomains {
+                    for subdomain in subdomains {
+                        let full_subdomain = format!("{}.{}", subdomain, domain);
+                        
+                        if found_subdomains.insert(full_subdomain.clone()) {
                             results.push(SubdomainResult {
                                 subdomain: full_subdomain,
                                 source: self.name.to_string(),
@@ -159,58 +126,21 @@ impl Source for SecurityTrailsSource {
                             });
                         }
                     }
+                }
 
-                    // Check for next page
-                    if let Some(meta) = st_response.meta {
-                        if let Some(next_scroll_id) = meta.scroll_id {
-                            scroll_id = Some(next_scroll_id);
-                        } else {
-                            break;
+                if let Some(meta) = st_response.meta {
+                    if let Some(limit_reached) = meta.limit_reached {
+                        if limit_reached {
+                            warn!("[{}] Limite de resultados atingido. Total de subdomínios: {:?}", 
+                                  self.name, st_response.subdomain_count);
                         }
                     }
                 }
-                Err(_) => {
-                    // If scroll API fails, try the simpler subdomain API
-                    if scroll_id.is_none() {
-                        let fallback_url = format!("https://api.securitytrails.com/v1/domain/{}/subdomains", domain);
-                        
-                        match session.client
-                            .get(&fallback_url)
-                            .header("APIKEY", api_key)
-                            .send()
-                            .await {
-                            Ok(response) => {
-                                let text = response.text().await
-                                    .map_err(|e| RustFinderError::NetworkError(e.to_string()))?;
 
-                                let fallback_response: SecurityTrailsResponse = serde_json::from_str(&text)
-                                    .map_err(|e| RustFinderError::JsonParseError(e.to_string(), text))?;
-
-                                if let Some(subdomains) = fallback_response.subdomains {
-                                    for subdomain in subdomains {
-                                        let full_subdomain = format!("{}.{}", subdomain, domain);
-                                        results.push(SubdomainResult {
-                                            subdomain: full_subdomain,
-                                            source: self.name.to_string(),
-                                            resolved: false,
-                                            ip_addresses: Vec::new(),
-                                        });
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                return Err(RustFinderError::SourceError {
-                                    source_name: self.name.to_string(),
-                                    message: format!("Both scroll and subdomain APIs failed: {}", e),
-                                });
-                            }
-                        }
-                    }
-                    break;
-                }
+                info!("[{}] Encontrados {} subdomínios únicos", self.name, results.len());
+                Ok(results)
             }
+            Err(e) => Err(e),
         }
-
-        Ok(results)
     }
 }

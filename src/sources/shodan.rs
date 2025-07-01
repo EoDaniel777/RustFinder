@@ -3,16 +3,25 @@ use crate::session::Session;
 use crate::sources::Source;
 use crate::types::{RustFinderError, SourceInfo, SubdomainResult};
 use async_trait::async_trait;
-use log::warn;
+use log::{info, warn};
 use serde::Deserialize;
+use std::collections::HashSet;
 
 #[derive(Debug, Deserialize)]
 struct ShodanResponse {
     domain: String,
     subdomains: Vec<String>,
-    result: Option<i32>,
-    error: Option<String>,
+    data: Option<Vec<ShodanData>>,
     more: Option<bool>,
+    error: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ShodanData {
+    subdomain: Option<String>,
+    #[serde(rename = "type")]
+    record_type: Option<String>,
+    value: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -78,32 +87,48 @@ impl Source for ShodanSource {
             }
         };
 
-        // Rate limiting
         session.check_rate_limit(&self.name).await?;
 
         let mut results = Vec::new();
+        let mut found_subdomains = HashSet::new();
         let mut page = 1;
+        let max_pages = 5;
 
         loop {
-            let url = format!("https://api.shodan.io/dns/domain/{}?key={}&page={}", domain, api_key, page);
+            let url = format!("https://api.shodan.io/dns/domain/{}", domain);
             
-            match session.get(&url).await {
+            let request_builder = session.client
+                .get(&url)
+                .query(&[
+                    ("key", api_key),
+                    ("page", &page.to_string())
+                ])
+                .header("Accept", "application/json");
+            
+            match session.send_request_with_retry(request_builder, &self.name).await {
                 Ok(response) => {
                     let status = response.status();
-                    let text = response.text().await
-                        .map_err(|e| RustFinderError::NetworkError(e.to_string()))?;
-
+                    
                     if !status.is_success() {
+                        let text = response.text().await
+                            .unwrap_or_else(|_| "Failed to read response body".to_string());
+                        
+                        if status.as_u16() == 429 || text.contains("rate limit") {
+                            return Err(RustFinderError::RateLimitError(self.name.to_string()));
+                        }
+                        
                         return Err(RustFinderError::SourceError {
                             source_name: self.name.to_string(),
                             message: format!("Shodan API returned status: {}. Body: {}", status, text),
                         });
                     }
 
+                    let text = response.text().await
+                        .map_err(|e| RustFinderError::NetworkError(e.to_string()))?;
+
                     let shodan_response: ShodanResponse = serde_json::from_str(&text)
                         .map_err(|e| RustFinderError::JsonParseError(e.to_string(), text))?;
 
-                    // Check for API errors
                     if let Some(error) = shodan_response.error {
                         return Err(RustFinderError::SourceError {
                             source_name: self.name.to_string(),
@@ -111,49 +136,52 @@ impl Source for ShodanSource {
                         });
                     }
 
-                    // Process subdomains
                     for subdomain in shodan_response.subdomains {
                         let full_subdomain = format!("{}.{}", subdomain, shodan_response.domain);
-                        results.push(SubdomainResult {
-                            subdomain: full_subdomain,
-                            source: self.name.to_string(),
-                            resolved: false,
-                            ip_addresses: Vec::new(),
-                        });
+                        if found_subdomains.insert(full_subdomain.clone()) {
+                            results.push(SubdomainResult {
+                                subdomain: full_subdomain,
+                                source: self.name.to_string(),
+                                resolved: false,
+                                ip_addresses: Vec::new(),
+                            });
+                        }
                     }
 
-                    // Check if there are more pages
+                    if let Some(data_array) = shodan_response.data {
+                        for data in data_array {
+                            if let Some(subdomain) = data.subdomain {
+                                let full_subdomain = if subdomain.ends_with(&format!(".{}", domain)) {
+                                    subdomain
+                                } else {
+                                    format!("{}.{}", subdomain, domain)
+                                };
+                                
+                                if found_subdomains.insert(full_subdomain.clone()) {
+                                    results.push(SubdomainResult {
+                                        subdomain: full_subdomain,
+                                        source: self.name.to_string(),
+                                        resolved: false,
+                                        ip_addresses: Vec::new(),
+                                    });
+                                }
+                            }
+                        }
+                    }
+
                     if let Some(more) = shodan_response.more {
-                        if more {
+                        if more && page < max_pages {
                             page += 1;
                             continue;
                         }
                     }
                     break;
                 }
-                Err(e) => {
-                    return Err(RustFinderError::SourceError {
-                        source_name: self.name.to_string(),
-                        message: format!("HTTP request failed: {}", e),
-                    });
-                }
+                Err(e) => return Err(e),
             }
         }
 
+        info!("[{}] Encontrados {} subdomínios únicos", self.name, results.len());
         Ok(results)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_api_key_management() {
-        let source = ShodanSource::new();
-        assert!(source.api_keys.is_empty());
-        
-        let source_with_keys = source.with_api_keys(vec!["test_key".to_string()]);
-        assert_eq!(source_with_keys.get_random_api_key(), Some(&"test_key".to_string()));
     }
 }

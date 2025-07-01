@@ -4,7 +4,6 @@ use crate::types::{RustFinderError, SourceInfo, SubdomainResult};
 use async_trait::async_trait;
 use crate::sources::Source;
 
-/// HackerTarget API source
 #[derive(Debug, Clone)]
 pub struct HackerTargetSource {
     name: String,
@@ -43,7 +42,7 @@ impl crate::sources::Source for HackerTargetSource {
     async fn enumerate(&self, domain: &str, session: &Session) -> Result<Vec<SubdomainResult>, RustFinderError> {
         let url = format!("https://api.hackertarget.com/hostsearch/?q={}", domain);
         
-        match session.get(&url).await {
+        match session.get(&url, &self.name).await {
             Ok(response) => {
                 let text = response.text().await
                     .map_err(|e| RustFinderError::NetworkError(e.to_string()))?;
@@ -59,7 +58,6 @@ impl crate::sources::Source for HackerTargetSource {
                     if !parts.is_empty() {
                         let subdomain = parts[0].trim().to_lowercase();
 
-                        // Garantir que o subdomínio pertence ao domínio-alvo
                         if subdomain.ends_with(&format!(".{}", domain)) {
                             let ip_addresses = if let Some(ip) = parts.get(1) {
                                 vec![ip.trim().to_string()]

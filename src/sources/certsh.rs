@@ -4,6 +4,7 @@ use crate::sources::Source;
 use crate::types::{RustFinderError, SourceInfo, SubdomainResult};
 use async_trait::async_trait;
 use serde::Deserialize;
+use std::collections::HashSet;
 
 #[derive(Debug, Deserialize)]
 struct CrtShResponse {
@@ -11,7 +12,6 @@ struct CrtShResponse {
     name_value: String,
 }
 
-/// CRT.sh certificate transparency logs source
 #[derive(Debug, Clone)]
 pub struct CrtShSource {
     name: String,
@@ -48,32 +48,47 @@ impl Source for CrtShSource {
     }
 
     async fn enumerate(&self, domain: &str, session: &Session) -> Result<Vec<SubdomainResult>, RustFinderError> {
+
+        session.check_rate_limit(&self.name).await?;
+        
         let url = format!("https://crt.sh/?q=%.{}&output=json", domain);
         
-        match session.get(&url).await {
+        let request_builder = session.client
+            .get(&url)
+            .header("Accept", "application/json")
+            .timeout(std::time::Duration::from_secs(30));
+        
+        match session.send_request_with_retry(request_builder, &self.name).await {
             Ok(response) => {
                 let text = response.text().await
                     .map_err(|e| RustFinderError::NetworkError(e.to_string()))?;
 
-                // Check if the response is HTML (e.g., a block page)
-                if text.trim_start().starts_with("<!DOCTYPE HTML") || text.trim_start().starts_with("<html") {
+                if text.trim_start().starts_with("<!DOCTYPE") || text.trim_start().starts_with("<html") {
                     return Err(RustFinderError::SourceError {
                         source_name: self.name.to_string(),
-                        message: format!("Received HTML response, possibly blocked or error page. Body: {}", &text[..100.min(text.len())]),
+                        message: "Received HTML response instead of JSON".to_string(),
                     });
+                }
+
+                if text.trim().is_empty() || text.trim() == "[]" {
+                    return Ok(Vec::new());
                 }
 
                 let crt_results: Vec<CrtShResponse> = serde_json::from_str(&text)
                     .map_err(|e| RustFinderError::JsonParseError(e.to_string(), text))?;
 
+                let mut found_subdomains = HashSet::new();
                 let mut results = Vec::new();
+                
                 for crt_result in crt_results {
-                    // name_value can contain multiple subdomains separated by newlines
+
                     for line in crt_result.name_value.lines() {
                         let subdomain = line.trim().to_lowercase();
                         
-                        // Filter out wildcards and ensure it ends with our domain
-                        if !subdomain.starts_with('*') && subdomain.ends_with(domain) {
+                        if !subdomain.starts_with('*') && 
+                           subdomain.ends_with(domain) && 
+                           subdomain != domain &&
+                           found_subdomains.insert(subdomain.clone()) {
                             results.push(SubdomainResult {
                                 subdomain,
                                 source: self.name.to_string(),
@@ -84,16 +99,10 @@ impl Source for CrtShSource {
                     }
                 }
 
-                // Remove duplicates
-                results.sort_by(|a, b| a.subdomain.cmp(&b.subdomain));
-                results.dedup_by(|a, b| a.subdomain == b.subdomain);
-
+                log::info!("[{}] Encontrados {} subdomínios únicos", self.name, results.len());
                 Ok(results)
             }
-            Err(e) => Err(RustFinderError::SourceError {
-                source_name: self.name.to_string(),
-                message: format!("HTTP request failed: {}", e),
-            }),
+            Err(e) => Err(e),
         }
     }
 }

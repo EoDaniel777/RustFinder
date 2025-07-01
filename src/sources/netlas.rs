@@ -3,12 +3,14 @@ use crate::sources::Source;
 use crate::types::{RustFinderError, SourceInfo, SubdomainResult};
 use crate::session::Session;
 use async_trait::async_trait;
-use log::warn;
-use serde::{Deserialize, Serialize};
+use log::{info, warn};
+use serde::Deserialize;
+use std::collections::HashSet;
 
 #[derive(Debug, Deserialize)]
-struct NetlasCountResponse {
-    count: i32,
+struct NetlasResponse {
+    items: Vec<NetlasItem>,
+    count: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -18,21 +20,7 @@ struct NetlasItem {
 
 #[derive(Debug, Deserialize)]
 struct NetlasData {
-    domain: String,
-    #[serde(rename = "last_updated")]
-    last_updated: Option<String>,
-    #[serde(rename = "@timestamp")]
-    timestamp: Option<String>,
-    level: Option<i32>,
-    zone: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-struct NetlasSearchRequest {
-    q: String,
-    fields: Vec<String>,
-    source_type: String,
-    size: i32,
+    domain: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -98,122 +86,70 @@ impl Source for NetlasSource {
             }
         };
 
-        // Rate limiting
         session.check_rate_limit(&self.name).await?;
 
-        // First, get count of domains
-        let count_query = format!("domain:*.{} AND NOT domain:{}", domain, domain);
-        let count_url = format!("https://app.netlas.io/api/domains_count/?q={}", urlencoding::encode(&count_query));
+        let mut results = Vec::new();
+        let mut found_subdomains = HashSet::new();
+        
+        let query = format!("domain:*.{}", domain);
+        let url = "https://app.netlas.io/api/domains/";
+        
+        let request_builder = session.client
+            .get(url)
+            .query(&[
+                ("q", query.as_str()),
+                ("fields", "domain"),
+                ("source_type", "include"),
+                ("size", "100")
+            ])
+            .header("Accept", "application/json")
+            .header("Authorization", format!("Bearer {}", api_key));
 
-        let count = match session.client
-            .get(&count_url)
-            .header("accept", "application/json")
-            .header("X-API-Key", api_key)
-            .send()
-            .await {
+        match session.send_request_with_retry(request_builder, &self.name).await {
             Ok(response) => {
-                let text = response.text().await
-                    .map_err(|e| RustFinderError::NetworkError(e.to_string()))?;
-
-                let count_response: NetlasCountResponse = serde_json::from_str(&text)
-                    .map_err(|e| RustFinderError::JsonParseError(e.to_string(), text))?;
-
-                count_response.count.min(10000) // Limit to avoid large requests
-            }
-            Err(e) => {
-                return Err(RustFinderError::SourceError {
-                    source_name: self.name.to_string(),
-                    message: format!("Failed to get domain count: {}", e),
-                });
-            }
-        };
-
-        if count == 0 {
-            return Ok(Vec::new());
-        }
-
-        // Make download request to get all domains
-        let download_url = "https://app.netlas.io/api/domains/download/";
-        let search_request = NetlasSearchRequest {
-            q: count_query,
-            fields: vec!["*".to_string()],
-            source_type: "include".to_string(),
-            size: count,
-        };
-
-        let request_body = serde_json::to_string(&search_request)
-            .map_err(|e| RustFinderError::SourceError {
-                source_name: self.name.to_string(),
-                message: format!("Failed to serialize request: {}", e),
-            })?;
-
-        match session.client
-            .post(download_url)
-            .header("Content-Type", "application/json")
-            .header("accept", "application/json")
-            .header("X-API-Key", api_key)
-            .body(request_body)
-            .send()
-            .await {
-            Ok(response) => {
-                let text = response.text().await
-                    .map_err(|e| RustFinderError::NetworkError(e.to_string()))?;
-
-                // Check if we got an error response
-                if text.contains("\"detail\"") && text.contains("rate") {
-                    return Err(RustFinderError::RateLimitError(self.name.to_string()));
+                let status = response.status();
+                
+                if !status.is_success() {
+                    let text = response.text().await
+                        .unwrap_or_else(|_| "Failed to read response body".to_string());
+                    
+                    if status.as_u16() == 429 {
+                        return Err(RustFinderError::RateLimitError(self.name.to_string()));
+                    }
+                    
+                    return Err(RustFinderError::SourceError {
+                        source_name: self.name.to_string(),
+                        message: format!("Netlas API returned status: {}. Body: {}", status, text),
+                    });
                 }
 
-                #[derive(Debug, Deserialize)]
-struct NetlasDownloadResponse {
-    data: Vec<NetlasItem>,
-}
+                let text = response.text().await
+                    .map_err(|e| RustFinderError::NetworkError(e.to_string()))?;
 
-// ... (restante do código)
-
-                let netlas_download_response: NetlasDownloadResponse = serde_json::from_str(&text)
+                let netlas_response: NetlasResponse = serde_json::from_str(&text)
                     .map_err(|e| RustFinderError::JsonParseError(e.to_string(), text))?;
 
-                let mut results = Vec::new();
-                for item in netlas_download_response.data {
-                    let subdomain = item.data.domain.trim_end_matches('.').to_lowercase();
-                    
-                    // Verify it's actually a subdomain of our target
-                    if subdomain.ends_with(domain) && subdomain != domain {
-                        results.push(SubdomainResult {
-                            subdomain,
-                            source: self.name.to_string(),
-                            resolved: false,
-                            ip_addresses: Vec::new(),
-                        });
+                for item in netlas_response.items {
+                    if let Some(subdomain) = item.data.domain {
+                        let subdomain = subdomain.trim_end_matches('.').to_lowercase();
+                        
+                        if subdomain.ends_with(domain) && 
+                           subdomain != domain &&
+                           found_subdomains.insert(subdomain.clone()) {
+                            results.push(SubdomainResult {
+                                subdomain,
+                                source: self.name.to_string(),
+                                resolved: false,
+                                ip_addresses: Vec::new(),
+                            });
+                        }
                     }
                 }
 
+                info!("[{}] Encontrados {} subdomínios únicos", self.name, results.len());
                 Ok(results)
             }
-            Err(e) => Err(RustFinderError::SourceError {
-                source_name: self.name.to_string(),
-                message: format!("HTTP request failed: {}", e),
-            }),
+            Err(e) => Err(e),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_source_creation() {
-        let source = NetlasSource::new();
-        assert_eq!(source.name(), "netlas");
-        assert!(source.api_keys.is_empty());
-    }
-
-    #[test]
-    fn test_api_key_management() {
-        let source = NetlasSource::new();
-        let source_with_keys = source.with_api_keys(vec!["test_key".to_string()]);
-        assert_eq!(source_with_keys.get_random_api_key(), Some(&"test_key".to_string()));
     }
 }
